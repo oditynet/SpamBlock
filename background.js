@@ -1,5 +1,6 @@
 class NetworkMonitorWithBlocker {
   constructor() {
+    this.blockedCountByTab = new Map();
     this.requestsByTab = new Map();
     this.requestCount = 0;
     this.currentTabId = null;
@@ -13,17 +14,76 @@ class NetworkMonitorWithBlocker {
     
     browser.tabs.onActivated.addListener((activeInfo) => {
       this.handleTabChange(activeInfo.tabId);
+      this.updateIcon(activeInfo.tabId);
     });
     
     browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       if (changeInfo.status === 'complete' && tab.active) {
         this.handleTabChange(tabId);
+        this.updateIcon(tabId);
+      }
+    });
+    
+    // Добавляем обработчики для сброса счетчика при навигации
+    browser.webNavigation.onBeforeNavigate.addListener((details) => {
+      if (details.frameId === 0) {
+        this.resetBlockedCountForTab(details.tabId);
+      }
+    });
+    
+    browser.webNavigation.onCommitted.addListener((details) => {
+      if (details.frameId === 0) {
+        this.resetBlockedCountForTab(details.tabId);
       }
     });
     
     this.setupRequestMonitoring();
     
     console.log('🔍 Network Monitor with Blocker initialized');
+  }
+  
+  resetBlockedCountForTab(tabId) {
+    this.blockedCountByTab.set(tabId, 0);
+    this.updateIcon(tabId);
+    console.log('🔄 Reset blocked count for tab:', tabId);
+  }
+  
+  getBlockedCountForTab(tabId) {
+    return this.blockedCountByTab.get(tabId) || 0;
+  }
+
+  incrementBlockedCount(tabId) {
+    const current = this.getBlockedCountForTab(tabId);
+    this.blockedCountByTab.set(tabId, current + 1);
+    this.updateIcon(tabId);
+    console.log('🔢 Blocked count for tab', tabId, 'is now:', current + 1);
+  }
+
+  async updateIcon(tabId = null) {
+    try {
+      if (tabId === null) {
+        const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+        if (tabs[0]) {
+          tabId = tabs[0].id;
+        }
+      }
+      
+      if (tabId) {
+        const blockedCount = this.getBlockedCountForTab(tabId);
+        
+        await browser.browserAction.setBadgeText({
+          tabId: tabId,
+          text: blockedCount > 0 ? blockedCount.toString() : ""
+        });
+        
+        await browser.browserAction.setBadgeBackgroundColor({
+          tabId: tabId,
+          color: '#666666'
+        });
+      }
+    } catch (error) {
+      console.error('Error updating icon:', error);
+    }
   }
   
   async loadBlockedPatterns() {
@@ -69,7 +129,9 @@ class NetworkMonitorWithBlocker {
     browser.webRequest.onBeforeRequest.addListener(
       (details) => {
         if (this.shouldBlockRequest(details)) {
-          console.log('🚫 BLOCKED request:', this.shortenUrl(details.url));
+          console.log('🚫 BLOCKED request:', details.method, this.shortenUrl(details.url));
+          // Увеличиваем счетчик только когда реально блокируем запрос
+          this.incrementBlockedCount(details.tabId);
           return { cancel: true };
         }
         
@@ -121,18 +183,23 @@ class NetworkMonitorWithBlocker {
 
   matchPattern(url, pattern) {
     try {
-      // Если паттерн содержит wildcards
       if (pattern.includes('*') || pattern.includes('?')) {
-        // Экранируем специальные символы regex, кроме * и ?
         let regexPattern = pattern
           .replace(/[.+^${}()|[\]\\]/g, '\\$&')
           .replace(/\*/g, '.*')
           .replace(/\?/g, '.');
         
-        const regex = new RegExp(`^${regexPattern}$`);
+        if (!pattern.startsWith('*')) {
+          regexPattern = '^' + regexPattern;
+        }
+        
+        if (!pattern.endsWith('*')) {
+          regexPattern = regexPattern + '$';
+        }
+        
+        const regex = new RegExp(regexPattern);
         return regex.test(url);
       } else {
-        // Простое сравнение для точных паттернов
         return url.includes(pattern);
       }
     } catch (error) {
@@ -166,13 +233,6 @@ class NetworkMonitorWithBlocker {
     }
     this.requestsByTab.get(details.tabId).set(requestId, requestInfo);
     
-    console.log('🚀 Request started:', {
-      tabId: details.tabId,
-      method: details.method,
-      url: this.shortenUrl(details.url),
-      type: details.type
-    });
-    
     this.saveRequest(requestInfo);
   }
   
@@ -202,9 +262,6 @@ class NetworkMonitorWithBlocker {
         request.fromCache = details.fromCache;
         request.statusColor = this.getStatusColor(request.statusCode);
         
-        console.log(`%c✅ Request completed: ${details.statusCode} ${this.shortenUrl(details.url)}`, 
-                   `color: ${request.statusColor}; font-weight: bold;`);
-        
         this.saveRequest(request);
       }
     }
@@ -220,9 +277,6 @@ class NetworkMonitorWithBlocker {
         request.completeTime = Date.now();
         request.duration = request.completeTime - request.startTime;
         request.statusColor = '#f44336';
-        
-        console.log(`%c❌ Request error: ${details.error} ${this.shortenUrl(details.url)}`, 
-                   'color: #f44336; font-weight: bold;');
         
         this.saveRequest(request);
       }
@@ -337,8 +391,6 @@ class NetworkMonitorWithBlocker {
       const result = await browser.storage.local.get({[storageKey]: []});
       const requests = result[storageKey].slice(0, limit);
       
-      console.log(`📊 Found ${requests.length} requests for tab ${this.currentTabId}`);
-      
       return requests;
       
     } catch (error) {
@@ -356,7 +408,6 @@ class NetworkMonitorWithBlocker {
       const storageKey = `tab_${this.currentTabId}_requests`;
       await browser.storage.local.set({[storageKey]: []});
       
-      // Очищаем memory cache
       if (this.requestsByTab.has(this.currentTabId)) {
         this.requestsByTab.get(this.currentTabId).clear();
       }
@@ -366,6 +417,13 @@ class NetworkMonitorWithBlocker {
       console.error('Error clearing current tab logs:', error);
       return false;
     }
+  }
+
+  async getBlockedCountForCurrentTab() {
+    if (!this.currentTabId) {
+      await this.updateCurrentTab();
+    }
+    return this.getBlockedCountForTab(this.currentTabId);
   }
 }
 
@@ -395,6 +453,10 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       
     case 'clearBlockedPatterns':
       monitor.clearBlockedPatterns().then(() => sendResponse({success: true}));
+      return true;
+      
+    case 'getBlockedCountForCurrentTab':
+      monitor.getBlockedCountForCurrentTab().then(sendResponse);
       return true;
   }
 });

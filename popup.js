@@ -25,6 +25,19 @@ class NetworkMonitorPopup {
     await this.loadLogs();
   }
   
+  async updateBlockedStats() {
+    try {
+      const blockedCount = await browser.runtime.sendMessage({
+        action: 'getBlockedCountForCurrentTab'
+      });
+      
+      document.getElementById('blockedStats').textContent = `Blocked: ${this.blockedPatterns.length} (${blockedCount} on page)`;
+    } catch (error) {
+      console.error('Error getting blocked count:', error);
+      document.getElementById('blockedStats').textContent = `Blocked: ${this.blockedPatterns.length}`;
+    }
+  }
+
   async loadAutoBlockSettings() {
     try {
       const result = await browser.storage.local.get({ autoBlockExternal: false });
@@ -75,7 +88,7 @@ class NetworkMonitorPopup {
         return hostname;
     }
     
-    const specialDomains = ['co', 'com', 'org', 'net', 'gov', 'edu', 'mil'];
+    const specialDomains = ['co', 'com', 'org', 'net', 'gov', 'edu', 'mil', 'ru'];
     const lastTwoParts = parts.slice(-2);
     
     if (specialDomains.includes(lastTwoParts[0]) && parts.length >= 3) {
@@ -237,11 +250,6 @@ class NetworkMonitorPopup {
         } catch (e) {
           this.currentTabHostname = null;
         }
-        
-        // Упрощенная шапка без лишней информации
-        document.getElementById('tabInfo').innerHTML = `
-          <strong>Current Tab:</strong> ${this.shortenUrl(tabs[0].url)}
-        `;
       } else {
         this.showError('No active tab found');
       }
@@ -347,6 +355,7 @@ class NetworkMonitorPopup {
       
       this.displayLogs(requests, hasNewRequests);
       this.updateRequestStats(requests.length);
+      await this.updateBlockedStats();
       
     } catch (error) {
       console.error('Error loading logs:', error);
@@ -542,7 +551,6 @@ class NetworkMonitorPopup {
     if (this.isUrlBlocked(url)) {
       await this.unblockScript(pattern);
     } else {
-      if (confirm(`Block all requests containing:\n${pattern}`)) {
         try {
           await browser.runtime.sendMessage({
             action: 'blockScript',
@@ -556,7 +564,6 @@ class NetworkMonitorPopup {
           console.error('Error blocking script:', error);
           alert('Error blocking script');
         }
-      }
     }
   }
 
@@ -564,9 +571,8 @@ class NetworkMonitorPopup {
     try {
       const urlObj = new URL(url);
       const domain = this.extractMainDomain(urlObj.hostname);
-      const wildcardPattern = `*.${domain}/*`;
+      const wildcardPattern = `*${domain}*`;
       
-      if (confirm(`Block entire domain with wildcard?\n${wildcardPattern}\n\nThis will block ALL requests to ${domain} and its subdomains`)) {
         await browser.runtime.sendMessage({
           action: 'blockScript',
           pattern: wildcardPattern
@@ -575,7 +581,6 @@ class NetworkMonitorPopup {
         await this.loadBlockedPatterns();
         await this.loadLogs();
         this.showStatus(`Blocked domain: ${wildcardPattern}`, 'success');
-      }
     } catch (error) {
       console.error('Error blocking domain:', error);
       alert('Error blocking domain');
@@ -585,10 +590,9 @@ class NetworkMonitorPopup {
   async blockDomainWithWildcard() {
     const domain = prompt('Enter domain to block (e.g., mail.ru):');
     if (domain) {
-      const cleanDomain = domain.replace(/https?:\/\//, '').replace(/\/.*$/, '');
-      const wildcardPattern = `*.${cleanDomain}/*`;
+      const cleanDomain = domain.trim();
+      const wildcardPattern = `*${cleanDomain}*`;
       
-      if (confirm(`Block entire domain with wildcard?\n${wildcardPattern}\n\nThis will block ALL requests to ${cleanDomain} and its subdomains`)) {
         try {
           await browser.runtime.sendMessage({
             action: 'blockScript',
@@ -602,7 +606,6 @@ class NetworkMonitorPopup {
           console.error('Error blocking domain:', error);
           alert('Error blocking domain');
         }
-      }
     }
   }
   
@@ -627,7 +630,7 @@ class NetworkMonitorPopup {
       const urlObj = new URL(url);
       return urlObj.hostname + urlObj.pathname;
     } catch {
-      return url.split('?')[0].substring(0, 100);
+      return url.split('?')[0];
     }
   }
   
@@ -722,7 +725,6 @@ class NetworkMonitorPopup {
   }
   
   async clearLogs() {
-    if (confirm('Clear all network logs for current tab?')) {
       try {
         const success = await browser.runtime.sendMessage({ 
           action: 'clearCurrentTabLogs' 
@@ -734,7 +736,6 @@ class NetworkMonitorPopup {
       } catch (error) {
         console.error('Error clearing logs:', error);
       }
-    }
   }
   
   async exportLogs() {

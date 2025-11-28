@@ -10,6 +10,7 @@
     "storage",
     "activeTab",
     "tabs",
+     "webNavigation",
     "<all_urls>"
   ],
   

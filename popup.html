@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <style>
-    body { width: 800px; height: 700px; margin: 0; font-family: Arial, sans-serif; background: #fafafa; display: flex; flex-direction: column; }
-    .header { background: #2196F3; color: white; padding: 12px; position: sticky; top: 0; z-index: 100; }
+    body { width: 800px; height: 550px; margin: 0; font-family: Arial, sans-serif; background: #fafafa; display: flex; flex-direction: column; overflow: hidden; }
+    .header { background: #2196F3; color: white; padding: 12px; position: sticky; top: 0; z-index: 90; }
     .tab-info { background: #1976D2; padding: 8px; font-size: 12px; margin-top: 8px; border-radius: 4px; word-break: break-all; }
     .tabs { display: flex; background: #e3f2fd; border-bottom: 1px solid #bbdefb; }
     .tab { padding: 10px 16px; cursor: pointer; border-bottom: 3px solid transparent; font-size: 13px; }
@@ -58,7 +58,6 @@
 <body>
   <div class="header">
     <h3 style="margin: 0;">🌐 Network Monitor & Blocker</h3>
-    <div class="tab-info" id="tabInfo">Loading current tab...</div>
   </div>
   
   <div class="tabs">
@@ -67,31 +66,31 @@
   </div>
   
   <div class="controls">
-    <button id="refresh">🔄 Refresh</button>
-    <button id="clear">🗑️ Clear Logs</button>
-    <button id="export">📤 Export JSON</button>
-    <button id="blockDomain" class="primary">🚫 Block Domain</button>
-    <button id="exportBlocked" class="secondary">📤 Export Blocked</button>
-    <button id="importBlocked" class="secondary">📥 Import Blocked</button>
-    <button id="clearBlocked" class="danger">🗑️ Clear All Blocked</button>
+    <button id="refresh">🔄</button>
+    <button id="clear">🗑</button>
+    <button id="export">📤Exp</button>
+    <button id="blockDomain" class="primary">🚫Block</button>
+    <button id="exportBlocked" class="secondary">📤Exp</button>
+    <button id="importBlocked" class="secondary">📥Imp</button>
+    <button id="clearBlocked" class="danger">🗑All</button>
     
     <div class="auto-refresh-controls">
       <div class="auto-refresh-toggle" id="autoRefreshToggle">
         <div class="toggle-switch active" id="toggleSwitch"></div>
-        <span>Auto-refresh</span>
+        <span>Auto-refr</span>
       </div>
     </div>
     
     <div class="auto-refresh-controls">
       <div class="auto-refresh-toggle" id="autoBlockToggle">
         <div class="toggle-switch" id="autoBlockToggleSwitch"></div>
-        <span>Auto-block external</span>
+        <span>Auto-block</span>
       </div>
     </div>
     
     <div class="stats">
       <span id="requestStats">Requests: 0</span>
-      <span id="blockedStats">Blocked: 0</span>
+      <span id="blockedStats">Blocked: 0 (0 on page)</span>
     </div>
   </div>
   
