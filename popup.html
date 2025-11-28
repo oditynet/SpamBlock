@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <style>
-    body { width: 700px; height: 800px; margin: 0; font-family: Arial, sans-serif; background: #fafafa; }
+    body { width: 800px; height: 700px; margin: 0; font-family: Arial, sans-serif; background: #fafafa; display: flex; flex-direction: column; }
     .header { background: #2196F3; color: white; padding: 12px; position: sticky; top: 0; z-index: 100; }
     .tab-info { background: #1976D2; padding: 8px; font-size: 12px; margin-top: 8px; border-radius: 4px; word-break: break-all; }
     .tabs { display: flex; background: #e3f2fd; border-bottom: 1px solid #bbdefb; }
@@ -22,7 +22,7 @@
     .toggle-switch.active { background: #4CAF50; }
     .toggle-switch::after { content: ''; position: absolute; width: 16px; height: 16px; background: white; border-radius: 50%; top: 2px; left: 2px; transition: transform 0.3s; }
     .toggle-switch.active::after { transform: translateX(20px); }
-.content { padding: 12px; overflow-y: auto; flex: 1; }
+    .content { padding: 12px; overflow-y: auto; flex: 1; }
     .log-entry { border-left: 4px solid #4CAF50; padding: 10px; margin: 8px 0; background: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); position: relative; }
     .log-entry.error { border-left-color: #f44336; }
     .log-entry.pending { border-left-color: #FF9800; }
@@ -50,7 +50,6 @@
     .wildcard-badge { background: #FF9800; color: white; border-radius: 3px; padding: 1px 4px; font-size: 9px; margin-left: 5px; }
     .unblock-btn { background: #f44336; color: white; border: none; border-radius: 3px; padding: 4px 8px; font-size: 10px; cursor: pointer; margin-left: 10px; }
     .hidden { display: none !important; }
-    .diagnostics { background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 10px; margin: 10px 0; font-size: 11px; }
     .new-requests-badge { position: sticky; top: 70px; background: #ff9800; color: white; padding: 5px 10px; border-radius: 12px; font-size: 11px; cursor: pointer; z-index: 99; margin: 0 auto; display: inline-block; left: 50%; transform: translateX(-50%); }
     .external-badge { display: inline-block; margin-right: 5px; font-size: 12px; }
     .status-message { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 15px 25px; border-radius: 8px; z-index: 1000; font-size: 14px; max-width: 300px; text-align: center; }
@@ -59,13 +58,12 @@
 <body>
   <div class="header">
     <h3 style="margin: 0;">🌐 Network Monitor & Blocker</h3>
-    <div class="tab-info" id="tabInfo">Loading tab information...</div>
+    <div class="tab-info" id="tabInfo">Loading current tab...</div>
   </div>
   
   <div class="tabs">
     <div class="tab active" data-tab="requests">📡 Requests</div>
     <div class="tab" data-tab="blocked">🚫 Blocked Scripts</div>
-    <div class="tab" data-tab="diagnostics">🔧 Diagnostics</div>
   </div>
   
   <div class="controls">
@@ -111,16 +109,6 @@
       <div class="blocked-list" id="blockedList">
         <div class="empty-state">No scripts blocked yet...<br><small>Click the block button on any request to add it to blocklist</small></div>
       </div>
-    </div>
-    
-    <!-- Diagnostics Tab -->
-    <div id="diagnosticsTab" class="hidden">
-      <div class="diagnostics">
-        <h4>🛠️ Diagnostics Information</h4>
-        <div id="diagnosticsInfo">Loading diagnostics...</div>
-      </div>
-      <button id="runDiagnostics" class="warning" style="margin: 10px 0;">Run Diagnostics</button>
-      <div id="diagnosticsResults"></div>
     </div>
   </div>
 

@@ -110,34 +110,36 @@ class NetworkMonitorWithBlocker {
     );
   }
   
-  /*shouldBlockRequest(details) {
+  shouldBlockRequest(details) {
     for (const pattern of this.blockedPatterns) {
-      if (details.url.includes(pattern)) {
+      if (this.matchPattern(details.url, pattern)) {
         return true;
       }
     }
     return false;
-  }*/
-  shouldBlockRequest(details) {
-    for (const pattern of this.blockedPatterns) {
-        if (pattern.includes('*')) {
-            // Wildcard matching
-            const regexPattern = pattern
-                .replace(/\*/g, '.*')
-                .replace(/\?/g, '.');
-            const regex = new RegExp(`^${regexPattern}$`);
-            if (regex.test(details.url)) {
-                return true;
-            }
-        } else {
-            // Simple substring matching
-            if (details.url.includes(pattern)) {
-                return true;
-            }
-        }
+  }
+
+  matchPattern(url, pattern) {
+    try {
+      // Если паттерн содержит wildcards
+      if (pattern.includes('*') || pattern.includes('?')) {
+        // Экранируем специальные символы regex, кроме * и ?
+        let regexPattern = pattern
+          .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+          .replace(/\*/g, '.*')
+          .replace(/\?/g, '.');
+        
+        const regex = new RegExp(`^${regexPattern}$`);
+        return regex.test(url);
+      } else {
+        // Простое сравнение для точных паттернов
+        return url.includes(pattern);
+      }
+    } catch (error) {
+      console.error('Error matching pattern:', pattern, error);
+      return false;
     }
-    return false;
-}
+  }
   
   handleRequestStart(details) {
     const requestId = details.requestId || `req_${Date.now()}_${this.requestCount++}`;
@@ -365,16 +367,6 @@ class NetworkMonitorWithBlocker {
       return false;
     }
   }
-  
-  async getCurrentTabInfo() {
-    try {
-      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-      return tabs[0] || null;
-    } catch (error) {
-      console.error('Error getting current tab info:', error);
-      return null;
-    }
-  }
 }
 
 const monitor = new NetworkMonitorWithBlocker();
@@ -387,10 +379,6 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       
     case 'clearCurrentTabLogs':
       monitor.clearCurrentTabLogs().then(sendResponse);
-      return true;
-      
-    case 'getCurrentTabInfo':
-      monitor.getCurrentTabInfo().then(sendResponse);
       return true;
       
     case 'blockScript':
@@ -407,14 +395,6 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
       
     case 'clearBlockedPatterns':
       monitor.clearBlockedPatterns().then(() => sendResponse({success: true}));
-      return true;
-      
-    case 'diagnose':
-      sendResponse({
-        currentTabId: monitor.currentTabId,
-        blockedPatternsCount: monitor.blockedPatterns.size,
-        requestsByTabSize: monitor.requestsByTab.size
-      });
       return true;
   }
 });

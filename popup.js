@@ -69,24 +69,19 @@ class NetworkMonitorPopup {
   extractMainDomain(hostname) {
     if (!hostname) return '';
     
-    // Удаляем www и другие субдомены, оставляя основной домен
     const parts = hostname.split('.');
     
-    // Для обычных доменов (example.com, example.ru) - берем последние 2 части
     if (parts.length <= 2) {
         return hostname;
     }
     
-    // Проверяем специальные домены (co.uk, com.br, etc.)
     const specialDomains = ['co', 'com', 'org', 'net', 'gov', 'edu', 'mil'];
     const lastTwoParts = parts.slice(-2);
     
-    // Если предпоследняя часть является специальным доменом, берем 3 части
     if (specialDomains.includes(lastTwoParts[0]) && parts.length >= 3) {
         return parts.slice(-3).join('.');
     }
     
-    // Для всех остальных случаев берем последние 2 части
     return lastTwoParts.join('.');
   }
   
@@ -109,14 +104,12 @@ class NetworkMonitorPopup {
       let skippedCount = 0;
       const domainsToBlock = new Set();
       
-      // Сначала собираем все внешние домены
       for (const request of requests) {
         try {
           const requestUrl = new URL(request.url);
           const requestDomain = requestUrl.hostname;
           const requestMainDomain = this.extractMainDomain(requestDomain);
           
-          // Блокируем если основной домен отличается от текущего
           if (requestMainDomain !== mainDomain) {
             domainsToBlock.add(requestMainDomain);
           }
@@ -125,7 +118,6 @@ class NetworkMonitorPopup {
         }
       }
       
-      // Блокируем каждый домен с wildcard
       for (const domain of domainsToBlock) {
         const wildcardPattern = `*.${domain}/*`;
         
@@ -246,11 +238,9 @@ class NetworkMonitorPopup {
           this.currentTabHostname = null;
         }
         
+        // Упрощенная шапка без лишней информации
         document.getElementById('tabInfo').innerHTML = `
-          <strong>URL:</strong> ${this.shortenUrl(tabs[0].url)} | 
-          <strong>Title:</strong> ${tabs[0].title || 'N/A'} |
-          <strong>ID:</strong> ${tabs[0].id} |
-          <strong>Status:</strong> ${tabs[0].status || 'unknown'}
+          <strong>Current Tab:</strong> ${this.shortenUrl(tabs[0].url)}
         `;
       } else {
         this.showError('No active tab found');
@@ -297,10 +287,6 @@ class NetworkMonitorPopup {
       this.clearAllBlocked();
     });
     
-    document.getElementById('runDiagnostics').addEventListener('click', () => {
-      this.runDiagnostics();
-    });
-    
     document.getElementById('autoRefreshToggle').addEventListener('click', () => {
       this.toggleAutoRefresh();
     });
@@ -313,7 +299,6 @@ class NetworkMonitorPopup {
       this.scrollToTop();
     });
 
-    // Новая кнопка для блокировки домена с wildcard
     document.getElementById('blockDomain').addEventListener('click', () => {
       this.blockDomainWithWildcard();
     });
@@ -338,14 +323,11 @@ class NetworkMonitorPopup {
   showTab(tabName) {
     document.getElementById('requestsTab').classList.add('hidden');
     document.getElementById('blockedTab').classList.add('hidden');
-    document.getElementById('diagnosticsTab').classList.add('hidden');
     
     document.getElementById(tabName + 'Tab').classList.remove('hidden');
     
     if (tabName === 'blocked') {
       this.loadBlockedList();
-    } else if (tabName === 'diagnostics') {
-      this.loadDiagnosticsInfo();
     }
   }
   
@@ -447,7 +429,6 @@ class NetworkMonitorPopup {
     const blockBtnClass = isBlocked ? 'block-btn blocked' : 'block-btn';
     const blockBtnText = isBlocked ? '🚫 Blocked' : '🚫 Block';
     
-    // Определяем является ли запрос внешним
     let externalBadge = '';
     let domain = '';
     if (this.currentTabHostname) {
@@ -537,16 +518,21 @@ class NetworkMonitorPopup {
   }
 
   matchPattern(url, pattern) {
-    if (pattern.includes('*')) {
-      // Wildcard matching
-      const regexPattern = pattern
-        .replace(/\*/g, '.*')
-        .replace(/\?/g, '.');
-      const regex = new RegExp(`^${regexPattern}$`);
-      return regex.test(url);
-    } else {
-      // Simple substring matching
-      return url.includes(pattern);
+    try {
+      if (pattern.includes('*') || pattern.includes('?')) {
+        let regexPattern = pattern
+          .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+          .replace(/\*/g, '.*')
+          .replace(/\?/g, '.');
+        
+        const regex = new RegExp(`^${regexPattern}$`);
+        return regex.test(url);
+      } else {
+        return url.includes(pattern);
+      }
+    } catch (error) {
+      console.error('Error matching pattern:', pattern, error);
+      return false;
     }
   }
   
@@ -725,69 +711,6 @@ class NetworkMonitorPopup {
     browser.tabs.create({
       url: browser.runtime.getURL('import.html')
     });
-  }
-  
-  async loadDiagnosticsInfo() {
-    try {
-      const diagnostics = await browser.runtime.sendMessage({
-        action: 'diagnose'
-      });
-      
-      document.getElementById('diagnosticsInfo').innerHTML = `
-        <strong>Current Tab ID:</strong> ${diagnostics.currentTabId || 'None'}<br>
-        <strong>Current Hostname:</strong> ${this.currentTabHostname || 'None'}<br>
-        <strong>Blocked Patterns:</strong> ${diagnostics.blockedPatternsCount}<br>
-        <strong>Tabs with Requests:</strong> ${diagnostics.requestsByTabSize}<br>
-        <strong>Auto-refresh:</strong> ${this.autoRefreshEnabled ? 'Enabled' : 'Disabled'}<br>
-        <strong>Auto-block External:</strong> ${this.autoBlockExternalEnabled ? 'Enabled' : 'Disabled'}<br>
-        <strong>Popup Tab:</strong> ${this.currentTab}
-      `;
-    } catch (error) {
-      document.getElementById('diagnosticsInfo').innerHTML = `Error: ${error.message}`;
-    }
-  }
-  
-  async runDiagnostics() {
-    try {
-      const results = document.getElementById('diagnosticsResults');
-      results.innerHTML = '<div class="empty-state">Running diagnostics...</div>';
-      
-      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-      const currentTab = tabs[0];
-      
-      const requests = await browser.runtime.sendMessage({
-        action: 'getCurrentTabRequests',
-        limit: 10
-      });
-      
-      const blocked = await browser.runtime.sendMessage({
-        action: 'getBlockedPatterns'
-      });
-      
-      results.innerHTML = `
-        <div class="diagnostics">
-          <h4>✅ Diagnostics Results</h4>
-          <strong>Current Tab:</strong> ${currentTab.id} - ${this.shortenUrl(currentTab.url)}<br>
-          <strong>Tab Status:</strong> ${currentTab.status}<br>
-          <strong>Requests Found:</strong> ${requests.length}<br>
-          <strong>Blocked Patterns:</strong> ${blocked.length}<br>
-          <strong>Auto-refresh:</strong> ${this.autoRefreshEnabled ? 'Enabled' : 'Disabled'}<br>
-          <strong>Auto-block External:</strong> ${this.autoBlockExternalEnabled ? 'Enabled' : 'Disabled'}<br>
-          <strong>Sample Requests:</strong><br>
-          <div style="font-size: 10px; margin-top: 5px;">
-            ${requests.slice(0, 3).map(req => `• ${this.shortenUrl(req.url)} (${req.status})`).join('<br>')}
-          </div>
-        </div>
-      `;
-      
-    } catch (error) {
-      document.getElementById('diagnosticsResults').innerHTML = `
-        <div class="diagnostics" style="background: #f8d7da; border-color: #f5c6cb;">
-          <h4>❌ Diagnostics Failed</h4>
-          Error: ${error.message}
-        </div>
-      `;
-    }
   }
   
   updateRequestStats(count) {
