@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { width: 700px; height: 800px; margin: 0; font-family: Arial, sans-serif; background: #fafafa; }
+    .header { background: #2196F3; color: white; padding: 12px; position: sticky; top: 0; z-index: 100; }
+    .tab-info { background: #1976D2; padding: 8px; font-size: 12px; margin-top: 8px; border-radius: 4px; word-break: break-all; }
+    .tabs { display: flex; background: #e3f2fd; border-bottom: 1px solid #bbdefb; }
+    .tab { padding: 10px 16px; cursor: pointer; border-bottom: 3px solid transparent; font-size: 13px; }
+    .tab.active { background: white; border-bottom-color: #2196F3; font-weight: bold; }
+    .controls { padding: 12px; background: white; display: flex; gap: 8px; border-bottom: 1px solid #e0e0e0; flex-wrap: wrap; }
+    .controls button { padding: 6px 12px; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; background: white; font-size: 12px; }
+    .controls button:hover { background: #f5f5f5; }
+    .controls button.primary { background: #4CAF50; color: white; border-color: #4CAF50; }
+    .controls button.danger { background: #f44336; color: white; border-color: #f44336; }
+    .controls button.warning { background: #FF9800; color: white; border-color: #FF9800; }
+    .controls button.secondary { background: #9E9E9E; color: white; border-color: #9E9E9E; }
+    .auto-refresh-controls { display: flex; align-items: center; gap: 8px; margin-left: 10px; font-size: 12px; }
+    .auto-refresh-toggle { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+    .toggle-switch { width: 40px; height: 20px; background: #ccc; border-radius: 10px; position: relative; transition: background 0.3s; }
+    .toggle-switch.active { background: #4CAF50; }
+    .toggle-switch::after { content: ''; position: absolute; width: 16px; height: 16px; background: white; border-radius: 50%; top: 2px; left: 2px; transition: transform 0.3s; }
+    .toggle-switch.active::after { transform: translateX(20px); }
+.content { padding: 12px; overflow-y: auto; flex: 1; }
+    .log-entry { border-left: 4px solid #4CAF50; padding: 10px; margin: 8px 0; background: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); position: relative; }
+    .log-entry.error { border-left-color: #f44336; }
+    .log-entry.pending { border-left-color: #FF9800; }
+    .url { font-weight: bold; word-break: break-all; font-size: 13px; color: #333; margin-right: 160px; }
+    .details { color: #666; font-size: 11px; margin-top: 4px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .method { background: #2196F3; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; }
+    .status { background: #4CAF50; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; }
+    .status.error { background: #f44336; }
+    .status.warning { background: #FF9800; }
+    .type { background: #795548; color: white; padding: 2px 6px; border-radius: 3px; font-size: 10px; }
+    .block-buttons { position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; }
+    .block-btn, .block-domain-btn { border: none; border-radius: 3px; padding: 4px 6px; font-size: 9px; cursor: pointer; white-space: nowrap; min-width: 70px; text-align: center; line-height: 1.2; }
+    .block-btn { background: #ff9800; color: white; }
+    .block-btn:hover { background: #f57c00; }
+    .block-btn.blocked { background: #9C27B0; }
+    .block-domain-btn { background: #2196F3; color: white; }
+    .block-domain-btn:hover { background: #1976D2; }
+    .empty-state { text-align: center; color: #666; padding: 40px; background: white; border-radius: 8px; margin: 20px 0; }
+    .stats { margin-left: auto; font-size: 12px; color: #666; display: flex; gap: 15px; }
+    .blocked-list { background: white; border-radius: 8px; padding: 15px; margin: 10px 0; }
+    .blocked-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee; }
+    .blocked-item:last-child { border-bottom: none; }
+    .blocked-pattern { flex: 1; word-break: break-all; font-family: monospace; font-size: 11px; }
+    .blocked-pattern.wildcard { color: #FF9800; font-weight: bold; }
+    .wildcard-badge { background: #FF9800; color: white; border-radius: 3px; padding: 1px 4px; font-size: 9px; margin-left: 5px; }
+    .unblock-btn { background: #f44336; color: white; border: none; border-radius: 3px; padding: 4px 8px; font-size: 10px; cursor: pointer; margin-left: 10px; }
+    .hidden { display: none !important; }
+    .diagnostics { background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 10px; margin: 10px 0; font-size: 11px; }
+    .new-requests-badge { position: sticky; top: 70px; background: #ff9800; color: white; padding: 5px 10px; border-radius: 12px; font-size: 11px; cursor: pointer; z-index: 99; margin: 0 auto; display: inline-block; left: 50%; transform: translateX(-50%); }
+    .external-badge { display: inline-block; margin-right: 5px; font-size: 12px; }
+    .status-message { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 15px 25px; border-radius: 8px; z-index: 1000; font-size: 14px; max-width: 300px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h3 style="margin: 0;">🌐 Network Monitor & Blocker</h3>
+    <div class="tab-info" id="tabInfo">Loading tab information...</div>
+  </div>
+  
+  <div class="tabs">
+    <div class="tab active" data-tab="requests">📡 Requests</div>
+    <div class="tab" data-tab="blocked">🚫 Blocked Scripts</div>
+    <div class="tab" data-tab="diagnostics">🔧 Diagnostics</div>
+  </div>
+  
+  <div class="controls">
+    <button id="refresh">🔄 Refresh</button>
+    <button id="clear">🗑️ Clear Logs</button>
+    <button id="export">📤 Export JSON</button>
+    <button id="blockDomain" class="primary">🚫 Block Domain</button>
+    <button id="exportBlocked" class="secondary">📤 Export Blocked</button>
+    <button id="importBlocked" class="secondary">📥 Import Blocked</button>
+    <button id="clearBlocked" class="danger">🗑️ Clear All Blocked</button>
+    
+    <div class="auto-refresh-controls">
+      <div class="auto-refresh-toggle" id="autoRefreshToggle">
+        <div class="toggle-switch active" id="toggleSwitch"></div>
+        <span>Auto-refresh</span>
+      </div>
+    </div>
+    
+    <div class="auto-refresh-controls">
+      <div class="auto-refresh-toggle" id="autoBlockToggle">
+        <div class="toggle-switch" id="autoBlockToggleSwitch"></div>
+        <span>Auto-block external</span>
+      </div>
+    </div>
+    
+    <div class="stats">
+      <span id="requestStats">Requests: 0</span>
+      <span id="blockedStats">Blocked: 0</span>
+    </div>
+  </div>
+  
+  <div class="content">
+    <!-- Requests Tab -->
+    <div id="requestsTab">
+      <div id="newRequestsBadge" class="new-requests-badge hidden" title="Click to scroll to top">New requests available ↑</div>
+      <div id="requestsContainer">
+        <div class="empty-state">No network requests detected in current tab...<br><small>Navigate or refresh the page to see requests</small></div>
+      </div>
+    </div>
+    
+    <!-- Blocked Scripts Tab -->
+    <div id="blockedTab" class="hidden">
+      <div class="blocked-list" id="blockedList">
+        <div class="empty-state">No scripts blocked yet...<br><small>Click the block button on any request to add it to blocklist</small></div>
+      </div>
+    </div>
+    
+    <!-- Diagnostics Tab -->
+    <div id="diagnosticsTab" class="hidden">
+      <div class="diagnostics">
+        <h4>🛠️ Diagnostics Information</h4>
+        <div id="diagnosticsInfo">Loading diagnostics...</div>
+      </div>
+      <button id="runDiagnostics" class="warning" style="margin: 10px 0;">Run Diagnostics</button>
+      <div id="diagnosticsResults"></div>
+    </div>
+  </div>
+
+  <div id="status" class="status"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
